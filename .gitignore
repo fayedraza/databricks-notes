@@ -1,0 +1,8 @@
+# Source slide photos (kept local, not published)
+IMG_*.jpeg
+IMG_*.jpg
+*.heic
+
+# Local tooling / macOS
+.claude/
+.DS_Store
