@@ -263,6 +263,29 @@ Every layer in the keynote sat on **Unity Catalog**. For agents, governance isn'
 what lets you give an autonomous system access to data *and* sleep at night. Unity Catalog was shown extended with
 **Business Glossary, Domains, and Metrics**, which feed semantic meaning into the agent layer (next chapter).
 
+### Unity Catalog ↔ Lakebase: the metadata & governance layer (not the data)
+
+A common question: *is Unity Catalog the metadata for Lakebase?* Roughly yes — it's the **unified governance and
+metadata layer that sits above the data**, holding the *information about* your Lakebase tables, not the rows
+themselves. Under LTAP, *"Lakebase stores data directly in Unity Catalog, using the same open formats as the
+Lakehouse,"* so Unity Catalog is the **single** catalog and governance layer across both your transactional
+(Lakebase) and analytical (Lakehouse) data. What it holds:
+
+- **Catalog metadata** — the `catalog.schema.table` namespace, table/column definitions and types, locations, tags.
+- **Governance** — grants/permissions, including **fine-grained row- and column-level** controls (the "extra info"
+  beyond just table-level access).
+- **Lineage** — what produced a table and what consumes it, spanning Lakebase *and* the lakehouse.
+- **Audit** — who read or changed what.
+- **Semantic context** *(DAIS 2026)* — Business Glossary, Domains, Metrics (also what powers Genie Ontology).
+
+Two caveats keep the model exact:
+
+- **Unity Catalog is not the data.** The rows live in the Postgres-on-object-storage layer (open Delta/Iceberg);
+  UC is the card catalog + access control + lineage on top, not a copy of the data.
+- **Lakebase keeps its own internal catalog too.** Being Postgres, it has system catalogs (`pg_catalog`, indexes,
+  MVCC visibility) that the engine uses at query time. That *operational* metadata is separate from Unity Catalog:
+  **UC governs and catalogs the tables; Postgres's internal catalog runs the transactions.**
+
 Two governance products specific to the agentic stack:
 
 - **Unity AI Gateway** *(DAIS 2026)* — a single entry point and **runtime governance layer for every model and
