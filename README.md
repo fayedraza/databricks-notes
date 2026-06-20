@@ -311,6 +311,49 @@ instead of an arbitrary or stale one — which directly reduces hallucinations a
 context in the prompt). Think of OntoRank as the ranking function that turns a noisy pile of extracted metadata
 into a trustworthy, ordered context layer for every agent call.
 
+The difference is easiest to see by comparing retrieval **before** and **after** OntoRank for the same question
+(scores are illustrative):
+
+```mermaid
+flowchart TB
+    subgraph BEFORE["Before OntoRank — every snippet weighted equally"]
+        direction LR
+        QB["Agent asks:<br/>'active users in EMEA?'"]
+        SB1["certified metric table"]
+        SB2["stale dashboard"]
+        SB3["someone's ad-hoc query"]
+        QB --> PB["Retrieve any match<br/>(no ranking)"]
+        SB1 --> PB
+        SB2 --> PB
+        SB3 --> PB
+        PB --> RB["Arbitrary / conflicting answer<br/>hallucination risk · more tokens"]
+    end
+
+    subgraph AFTER["After OntoRank — ranked by authority"]
+        direction LR
+        QA["Agent asks:<br/>'active users in EMEA?'"]
+        SA1["certified metric table<br/>score 0.95"]
+        SA2["stale dashboard<br/>score 0.30"]
+        SA3["ad-hoc query<br/>score 0.10"]
+        QA --> PA["Rank by source · usage ·<br/>certified ties · freshness"]
+        SA1 --> PA
+        SA2 --> PA
+        SA3 --> PA
+        PA --> RA["Top-ranked trusted definition wins<br/>accurate · fewer tokens"]
+    end
+
+    classDef bad fill:#7A1F1F,stroke:#B33,color:#FFFFFF;
+    classDef good fill:#1E5631,stroke:#3A8,color:#FFFFFF;
+    classDef win fill:#FF3621,stroke:#990000,color:#FFFFFF,font-weight:bold;
+    class RB bad;
+    class RA good;
+    class SA1 win;
+```
+
+The mechanism is the same in both cases — extract snippets, retrieve for a query — but OntoRank inserts a
+**ranking step** so the agent is handed the certified, frequently-used, fresh definition instead of whichever
+snippet happened to match.
+
 📚 [Introducing Genie One, Genie Ontology, and Genie Agents (blog)](https://www.databricks.com/blog/introducing-genie-one-genie-ontology-and-genie-agents) ·
 [Genie Ontology & Genie One (press release)](https://www.databricks.com/company/newsroom/press-releases/databricks-launches-genie-one-all-new-agentic-coworker-every-team) ·
 [Not PageRank but OntoRank — context & authority for AI (ITdaily)](https://itdaily.com/blogs/cloud/databricks-genie-ontology/)
@@ -370,9 +413,34 @@ Underpinning training is **AI Runtime** *(DAIS 2026)* — **serverless GPU compu
 powerful GPUs on-demand, research-grade and enterprise-scale, with **multi-node training**. Genie Code
 automatically moves jobs onto AI Runtime when a GPU is needed.
 
+### How ZeroOps detects data drift (worked example)
+
+ZeroOps doesn't ship a new drift detector — it watches the platform's existing observability layer (**inference
+tables + Lakehouse Monitoring**) and acts on it autonomously. The chain:
+
+1. **Inputs & outputs are captured.** A served model's **inference table** automatically logs every request and
+   response as a Unity Catalog Delta table; together with the upstream feature tables, that gives ZeroOps the live
+   distribution of model inputs *and* predictions.
+2. **Lakehouse Monitoring computes drift.** Each monitor run emits a **profile metrics** table (per-window stats:
+   mean, stddev, % nulls, counts) and a **drift metrics** table comparing the current window against a **baseline**
+   (the training / "expected" distribution) and against the **previous window**.
+3. **The statistics.** Per feature it runs distribution tests and distance measures — **Chi-square, KS,
+   Jensen–Shannon, Wasserstein, total variation** — plus simple shifts (mean, % null). Crossing a threshold flags
+   that column. This catches **input/feature drift**, **prediction drift**, and (once labels arrive)
+   **model-quality drift**.
+4. **ZeroOps interprets it continuously.** A model can have zero pipeline errors and still produce bad
+   predictions, so ZeroOps watches whether *outputs stay trustworthy*, not just whether jobs succeed.
+5. **Then it repairs.** It diagnoses the cause, **trains a corrected candidate on corrected features, evaluates it
+   against the same eval suite the production model was held to**, and brings you a validated, deployment-ready fix
+   to approve before it touches live traffic.
+
+In one line: **inference tables supply the data → Lakehouse Monitoring computes statistical drift vs. a baseline →
+ZeroOps interprets it and proposes a validated retrain.**
+
 📚 [Genie Code docs](https://docs.databricks.com/aws/en/genie-code/) ·
 [What's new in Genie Code (DAIS 2026)](https://www.databricks.com/blog/whats-new-genie-code-data-ai-summit-2026) ·
 [Introducing Genie ZeroOps](https://www.databricks.com/blog/introducing-genie-zeroops) ·
+[Lakehouse Monitoring — metric tables](https://docs.databricks.com/en/lakehouse-monitoring/monitor-output.html) ·
 [AI platform: agents for ML engineering & deep learning (blog)](https://www.databricks.com/blog/whats-new-ai-platform-agents-ml-engineering-our-deep-learning-platform-and-new-capabilities)
 
 ---
@@ -465,6 +533,8 @@ platform implies — the same arc as the chapters above:
 - [Well-architected data lakehouse](https://docs.databricks.com/aws/en/lakehouse-architecture/well-architected)
 - [Agent Bricks — build/evaluate/deploy a retrieval agent (tutorial)](https://docs.databricks.com/aws/en/generative-ai/tutorials/agent-framework-notebook)
 - [Genie Code](https://docs.databricks.com/aws/en/genie-code/)
+- [Lakehouse Monitoring — introduction](https://docs.databricks.com/gcp/en/lakehouse-monitoring/)
+- [Lakehouse Monitoring — metric & drift tables](https://docs.databricks.com/en/lakehouse-monitoring/monitor-output.html)
 
 ### Blogs & announcements (DAIS 2026)
 - [Databricks launches LTAP (press release)](https://www.databricks.com/company/newsroom/press-releases/databricks-launches-ltap-first-lake-transactionalanalytical)
@@ -497,10 +567,10 @@ platform implies — the same arc as the chapters above:
 
 ## Source material
 
-This README was reconstructed from 27 photographs of keynote slides (`IMG_9855`–`IMG_9907`) taken at the
-Databricks **Data + AI Summit 2026**. Slide content was transcribed from the photos and cross-checked against the
-official documentation and announcements linked above. Where the photographs were partial or angled, descriptions
-reflect the legible portions of each slide.
+This README was reconstructed from photographs of keynote slides taken at the Databricks **Data + AI Summit
+2026**. Slide content was transcribed from the photos and cross-checked against the official documentation and
+announcements linked above. Where the photographs were partial or angled, descriptions reflect the legible
+portions of each slide.
 
 > ⚠️ **Accuracy note:** Some products were announced at the summit and may be in preview or have evolving names
 > (e.g., LTAP, Reyden, Lakehouse//RT, Genie ZeroOps/Code, Omnigent, AI Runtime, CustomerLake, Lakewatch). Always
