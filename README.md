@@ -171,6 +171,14 @@ It's worth being precise here, because "Lakehouse" means two different things an
 - **Lakehouse-as-engine** — the analytical engine/product (Spark/Photon, and now **Lakehouse//RT**) that scans
   that storage.
 
+**You never "set up" a Lakehouse.** Because the Lakehouse is this storage foundation — not a product you spin up —
+**every piece of raw data you land as a governed open-format table automatically becomes part of the lakehouse.**
+There is nothing separate to build, provision, or turn on; the lakehouse is simply what your governed Delta /
+Iceberg tables *are*. Under LTAP this extends to Lakebase: its transactional writes are stored in the same open
+formats under Unity Catalog, so operational data written by an app or agent **automatically joins the lakehouse
+too** — no pipeline, no copy. In practice you provision *compute* (a Lakebase instance, an analytical warehouse)
+and *land data*; the lakehouse is what those produce together.
+
 Under LTAP, **Lakebase is built on the lakehouse storage foundation.** The announcement is explicit: Lakebase is
 *"serverless Postgres deployed on object storage — the same storage layer powering the Lakehouse,"* and *"Lakebase
 stores data directly in Unity Catalog, using the same open formats as the Lakehouse."* So Lakebase is **not** a
@@ -199,10 +207,11 @@ The keynote also introduced **Lakehouse//RT** *(DAIS 2026)* — a real-time anal
 
 ## Chapter 3 — Lakebase: the transactional layer an agent runs on
 
-This is the center of gravity for an AI engineer, and the part the rest of the architecture exists to enable.
-**Lakebase** *(DAIS 2026, GA-track)* is **fully managed, serverless Postgres, co-located with your lakehouse**.
-Instead of standing up a separate operational database and wiring CDC back to analytics, Lakebase *is* the
-operational face of your governed data.
+This is the center of gravity for an AI engineer, and the part the rest of the architecture exists to enable. In
+the simplest terms, **Lakebase is the database *in* Databricks** — the platform's own built-in, fully managed,
+serverless, **Postgres-compatible** operational database. There is no separate database product to evaluate or
+bolt on: Lakebase *is* the database. It runs co-located with your lakehouse, so instead of standing up an external
+operational database and wiring CDC back to analytics, Lakebase *is* the operational face of your governed data.
 
 Here's why it's the database an agent actually needs. An agent's runtime needs are transactional-database needs:
 read/write state every turn, serve features in milliseconds, retrieve context, isolate runs. A data *warehouse*
